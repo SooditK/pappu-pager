@@ -54,12 +54,13 @@ func main() {
 				response.Reply("Please provide all the parameters")
 				return
 			}
-			url := "https://api.newscatcherapi.com/v2/search?q=ESG&page_size=10&countries=IN"
+			baseurl := "https://api.newscatcherapi.com/v2/search?q="
+			url := fmt.Sprintf("%s%s&page_size=%s&countries=%s", baseurl, query, pageSize, countries)
 			req, err := http.NewRequest("GET", url, nil)
 			if err != nil {
 				panic(err)
 			}
-			req.Header.Set("Authorization", "Bearer YOUR_API_KEY")
+			req.Header.Set("x-api-key", os.Getenv("API_KEY"))
 			client := http.DefaultClient
 			resp, err := client.Do(req)
 			if err != nil {
