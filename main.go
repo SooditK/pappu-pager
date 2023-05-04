@@ -45,7 +45,7 @@ func main() {
 	bot := slacker.NewClient(os.Getenv("SLACK_BOT_TOKEN"), os.Getenv("SLACK_APP_TOKEN"))
 	queryDefinition := &slacker.CommandDefinition{
 		Description: "Query!",
-		Examples:    []string{"data {query} {page_size} {countries}"},
+		Examples:    []string{"query {query} {page_size} {countries}"},
 		Handler: func(botCtx slacker.BotContext, request slacker.Request, response slacker.ResponseWriter) {
 			query := request.Param("query")
 			pageSize := request.Param("page_size")
@@ -91,7 +91,53 @@ func main() {
 			response.Reply(articles)
 		},
 	}
+
+	summaryDefinition := &slacker.CommandDefinition{
+		Description: "Summary!",
+		Examples:    []string{"summary {query} {page_size} {countries}"},
+		Handler: func(botCtx slacker.BotContext, request slacker.Request, response slacker.ResponseWriter) {
+			query := request.Param("query")
+			pageSize := request.Param("page_size")
+			countries := request.Param("countries")
+			if query == "" || pageSize == "" || countries == "" {
+				response.Reply("Please provide all the parameters")
+				return
+			}
+			baseurl := "https://api.newscatcherapi.com/v2/search?q="
+			url := fmt.Sprintf("%s%s&page_size=%s&countries=%s", baseurl, query, pageSize, countries)
+			req, err := http.NewRequest("GET", url, nil)
+			if err != nil {
+				panic(err)
+			}
+			req.Header.Set("x-api-key", os.Getenv("API_KEY"))
+			client := http.DefaultClient
+			resp, err := client.Do(req)
+			if err != nil {
+				panic(err)
+			}
+			defer resp.Body.Close()
+			var data APIResponse
+			err = json.NewDecoder(resp.Body).Decode(&data)
+			if err != nil {
+				panic(err)
+			}
+			articles := ""
+			separator := "\n----------------------------------------\n"
+			for _, article := range data.Articles {
+				r := regexp.MustCompile(`\n{2,}`)
+				summary := r.ReplaceAllString(article.Summary, "\n")
+				articles += fmt.Sprintf("*Title:* %s\n*Excerpt:* %s\n*Summary:* %s\n",
+					article.Title,
+					article.Excerpt,
+					summary)
+				articles += separator
+			}
+			response.Reply(articles)
+		},
+	}
+
 	bot.Command("query <query> <page_size> <countries>", queryDefinition)
+	bot.Command("summary <query> <page_size> <countries>", summaryDefinition)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	err := bot.Listen(ctx)
